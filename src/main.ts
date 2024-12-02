@@ -1,26 +1,39 @@
-import { Component, effect, inject, resource, signal } from '@angular/core';
+import { Component, inject, resource, signal } from '@angular/core';
 import { rxResource } from '@angular/core/rxjs-interop';
-import {
-  provideHttpClient,
-  HttpClient,
-  HttpErrorResponse,
-} from '@angular/common/http';
+import { provideHttpClient, HttpClient } from '@angular/common/http';
 import { bootstrapApplication } from '@angular/platform-browser';
 
-import { distinctUntilChanged, map, catchError, of, tap } from 'rxjs';
-
-const API_URL: string = 'https://dummyjson.com/users';
-type User = {
-  id: number;
-  firstName: string;
-  lastName: string;
-};
+import { distinctUntilChanged, map, catchError } from 'rxjs';
+import { API_URL, User } from './user';
+import { ApiService } from './api.service';
 
 @Component({
   selector: 'app-root',
   template: `
-    <input (input)="search($event)" placeholder="Search user..."/>
+    <input (input)="search($event)" placeholder="Type to search user..."/>  
+        
+    <br />
+    <br />
     
+    <button (click)="load()">Load</button>
+    
+    <br />
+    <br />
+    
+    <button (click)="reload()">Reload</button>
+    
+    <br />
+
+    <h2>api service</h2>
+    <ul>
+      @for (user of apiUsers(); track user.id) {
+        <li>{{ user.firstName }}{{ user.lastName }}</li>
+      } @empty {
+        <p>No Users!</p>
+      }
+
+    </ul>
+
     <br />
 
     <h2>resource</h2>
@@ -35,7 +48,6 @@ type User = {
       } @empty {
         <p>No Users!</p>
       }
-
     </ul>
 
     <br />
@@ -56,10 +68,15 @@ type User = {
   `,
 })
 export class App {
-  http = inject(HttpClient);
-  query = signal<string>('');
+  #http = inject(HttpClient);
+  #apiService = inject(ApiService);
 
-  users = resource<User[], string>({
+  apiUsers = this.#apiService.users;
+
+  // Set it to undefined to postpone the API call to when the query has a value
+  query = signal<string | undefined>(undefined);
+
+  users = resource<User[], string | undefined>({
     request: () => this.query(),
     loader: async ({ request, abortSignal }) => {
       const users = await fetch(`${API_URL}/search?q=${request}`, {
@@ -71,12 +88,12 @@ export class App {
     },
   });
 
-  rxUsers = rxResource<User[], string>({
+  rxUsers = rxResource<User[], string | undefined>({
     request: () => this.query(),
     loader: ({ request }) =>
-      this.http.get<{ users: User[] }>(`${API_URL}/search?q=${request}`).pipe(
+      this.#http.get<{ users: User[] }>(`${API_URL}/search?q=${request}`).pipe(
         distinctUntilChanged(),
-        map((res) => res.users),
+        map(({ users }) => users),
         catchError(() => {
           throw Error('Unable to load!');
         })
@@ -86,6 +103,18 @@ export class App {
   search(event: Event) {
     const { value } = event.target as HTMLInputElement;
     this.query.set(value);
+
+    this.#apiService.doApiCall(value);
+  }
+
+  load() {
+    this.query.set('');
+    this.#apiService.doApiCall();
+  }
+
+  reload() {
+    this.users.reload();
+    this.rxUsers.reload();
   }
 }
 

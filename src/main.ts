@@ -1,121 +1,57 @@
-import { Component, inject, resource, signal } from '@angular/core';
-import { rxResource } from '@angular/core/rxjs-interop';
-import { provideHttpClient, HttpClient } from '@angular/common/http';
+import { Component, inject } from '@angular/core';
+import { RouterLink, RouterOutlet, provideRouter } from '@angular/router';
+import { provideHttpClient } from '@angular/common/http';
 import { bootstrapApplication } from '@angular/platform-browser';
 
-import { distinctUntilChanged, map, catchError } from 'rxjs';
-import { API_URL, User } from './user';
-import { ApiService } from './api.service';
+import { ApiService } from './app/shared/api.service';
+import { routes } from './app/app-routes';
 
 @Component({
   selector: 'app-root',
+  imports: [RouterOutlet, RouterLink],
   template: `
-    <input (input)="search($event)" placeholder="Type to search user..."/>  
-        
-    <br />
-    <br />
-    
-    <button (click)="load()">Load</button>
-    
-    <br />
-    <br />
-    
-    <button (click)="reload()">Reload</button>
-    
-    <br />
-
-    <h2>api service</h2>
-    <ul>
-      @for (user of apiUsers(); track user.id) {
-        <li>{{ user.firstName }}{{ user.lastName }}</li>
-      } @empty {
-        <p>No Users!</p>
-      }
-
-    </ul>
+    <section search>
+      <input (input)="search($event)" placeholder="Type to search user..."/>
+    </section>
 
     <br />
 
-    <h2>resource</h2>
-    <ul>
-      @let error = users.error();
-      @if (error) { <p>{{ error }}</p> }
-
-      @if (users.isLoading()) { <p>Loading Users...</p> }
-
-      @for (user of users.value(); track user.id) {
-        <li>{{ user.firstName }}{{ user.lastName }}</li>
-      } @empty {
-        <p>No Users!</p>
-      }
-    </ul>
+    <a routerLink="/resources">Resources</a>
 
     <br />
 
-    <h2>rxResource</h2>
-    <ul>
-      @let rxError = rxUsers.error();
-      @if (rxError) { <p>{{ rxError }}</p> }
+    <a routerLink="/http-resources">Http Resources</a>
 
-      @if (rxUsers.isLoading()) { <p>Loading Users...</p> }
-
-      @for (rxUser of rxUsers.value(); track rxUser.id) {
-        <li>{{ rxUser.firstName }}{{ rxUser.lastName }}</li>
-      } @empty {
-        <p>No Users!</p>
-      }
-    </ul>
+    <router-outlet />
   `,
+  styles: `
+    section[search] {
+      position: sticky;
+      top: 8px;
+
+      display: flex;
+      justify-content: flex-start;
+      align-items: center;
+
+      height: 50px;
+      background-color: white;
+    }
+  `
 })
 export class App {
-  #http = inject(HttpClient);
   #apiService = inject(ApiService);
-
-  apiUsers = this.#apiService.users;
-
-  // Set it to undefined to postpone the API call to when the query has a value
-  query = signal<string | undefined>(undefined);
-
-  users = resource<User[], string | undefined>({
-    request: () => this.query(),
-    loader: async ({ request, abortSignal }) => {
-      const users = await fetch(`${API_URL}/search?q=${request}`, {
-        signal: abortSignal,
-      });
-
-      if (!users.ok) throw Error('Unable to load!');
-      return (await users.json()).users;
-    },
-  });
-
-  rxUsers = rxResource<User[], string | undefined>({
-    request: () => this.query(),
-    loader: ({ request }) =>
-      this.#http.get<{ users: User[] }>(`${API_URL}/search?q=${request}`).pipe(
-        distinctUntilChanged(),
-        map(({ users }) => users),
-        catchError(() => {
-          throw Error('Unable to load!');
-        })
-      ),
-  });
 
   search(event: Event) {
     const { value } = event.target as HTMLInputElement;
-    this.query.set(value);
 
+    this.#apiService.query.set(value);
     this.#apiService.doApiCall(value);
   }
 
   load() {
-    this.query.set('');
+    this.#apiService.query.set('');
     this.#apiService.doApiCall();
-  }
-
-  reload() {
-    this.users.reload();
-    this.rxUsers.reload();
   }
 }
 
-bootstrapApplication(App, { providers: [provideHttpClient()] });
+bootstrapApplication(App, { providers: [provideHttpClient(), provideRouter(routes)] });

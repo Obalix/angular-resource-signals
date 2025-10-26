@@ -41,6 +41,10 @@ import { routes } from './app/app-routes';
 export class App {
   #apiService = inject(ApiService);
 
+  constructor() {
+    this.load();
+  }
+  
   search(event: Event) {
     const { value } = event.target as HTMLInputElement;
 

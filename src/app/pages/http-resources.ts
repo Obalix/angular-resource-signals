@@ -61,7 +61,7 @@ import { ApiService } from "../shared/api.service";
 export default class HttpResourceComponent {
     #apiService = inject(ApiService);
 
-    httpUser = httpResource<{ users: User[] }>(API_URL);
+    httpUser = httpResource<{ users: User[] }>(() => `${API_URL}/search?q=${this.#apiService.query()}`);
     httpUserReactive = httpResource<{ users: User[] }>(() => `${API_URL}/search?q=${this.#apiService.query()}`);
 
     inputQuery = debounceDistinctSignal(this.#apiService.query, 1000);
